@@ -2,7 +2,7 @@
 
 var extendJQuery;
 extendJQuery = function() { 
-  if (typeof $ !== 'undefined') {
+	if (typeof $ !== 'undefined') {
 		$.getCSS = $.getCSS || function(url) {
 			if (document.createStyleSheet) {
 				document.createStyleSheet(url);
@@ -18,6 +18,7 @@ extendJQuery();
 var mapListenerInfo,cadastreLayerListener; // Listener для идентификации кадастрового участка на карте
 var balloonInfo,balloonSearch; // balloon для идентификации и поиска кадастрового участка на карте
 var cadastreLayerInfo,cadastreLayerSearch;
+var cadastreServer;
 
 //================справочники Росреестра===============================//
 var PARCEL_STATES = ['Ранее учтенный', '', 'Условный', 'Внесенный', 'Временный (Удостоверен)', 'Учтенный', 'Снят с учета', 'Аннулированный'];
@@ -37,9 +38,9 @@ var cadastre =  function(container){
 
 		var mapExtent = map.getVisibleExtent();
 		var queryString = "&bbox="+merc_x(mapExtent.minX)+"%2C"+merc_y(mapExtent.minY)+"%2C"+merc_x(mapExtent.maxX)+"%2C"+merc_y(mapExtent.maxY)+"&bboxSR=3395&imageSR=3395&size=" + +map.width()+","+map.height() + "&f=image";
-		var tUrl = "http://maps.rosreestr.ru/ArcGIS/rest/services/CadastreNew/Thematic/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;
+		var tUrl = cadastreServer+"CadastreNew/Thematic/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;
 		if (cbDivision.checked){
-			var sUrl = "http://maps.rosreestr.ru/ArcGIS/rest/services/CadastreNew/Cadastre/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;
+			var sUrl = cadastreServer+"CadastreNew/Cadastre/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;
 			cadastreLayer.setImageExtent({url:sUrl, extent: mapExtent, noCache: true});
 			//cadastreLegend.innerHTML = 'Кадастровые сведения</br><table cellspacing="0" cellpadding="0"><tbody><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAACRQTFRF/v///v7+////////5gAA6VhY8amp87u79svL+Nra+ufn/fPzbT1i2gAAAAx0Uk5TAP//////////////CcRQJgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAElJREFUKJHt0jESwCAIRFEIiCL3v29SogOOiW1++zoW6MJhYpDIY5AJ8wlVHaqO9EIXqScEF/70hSg97zRK25vyJZXVs1lsRewGZtsJDm3zFo0AAAAASUVORK5CYII="></td><td><span>Кадастровые округа</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAACRQTFRF/v//////////////5gAA6VhY7Ht77pSU8amp9svL+ufn////TwQsdgAAAAx0Uk5TAP//////////////CcRQJgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAExJREFUKJHt0jESgEAIQ9G4gAvk/ve109kdGDsrf/vKBAejKjnAqWVGRC2q8UbTt+wmpyzRHxIsyU9fUT+K9VM2B8iOErRaTmK0F70ANygKXZpOPcIAAAAASUVORK5CYII="></td><td><span>Кадастровые районы</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAACpQTFRF/v///v///v///v///v///v7+/v7+////5gAA6VhY7pSU8amp87u7////w4W10AAAAA50Uk5TAP////////////////9XStsUAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAW0lEQVQoke2SOxaAIAwEE5GQ7/2vK8/CBxJaK6edYosdOChSCIHCNMGDIIxTPCCUWRaY9VayLsmjapmogyowUX71lXqdcg5qe+U2AM+zsdZj8yw267FhnmgjvAB2phHJ+R544QAAAABJRU5ErkJggg=="></td><td><span>Кадастровые кварталы</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABVQTFRF/v//+/Pz+ufn8ru78Kqq7ZSU6VhYaBHp5QAAAAd0Uk5TAP///////6V/pvsAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAAvSURBVCiRY2AgEzCzYQEsYCk2JkYMwMQGkWLENIlxVGq4SeFOACzYkg0rpknEAQAWXwJBzbWO4wAAAABJRU5ErkJggg=="></td><td><span>Земельные участки</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//8ru78Kqq7ZSU6VhY+nJy/Xp6/39/wKq0QwAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>Объекты капитального строительства</span></td></tr></tbody></table';
 		}
@@ -214,7 +215,7 @@ var cadastre =  function(container){
 		if (inputField.value != ''){
 			var cadastreNumber=checkCadastreNumber(inputField.value);
 			if(cadastreNumber){
-				$.getJSON('http://maps.rosreestr.ru/ArcGIS/rest/services/CadastreNew/Cadastre/MapServer/exts/GKNServiceExtension/online/parcel/find',{
+				$.getJSON(cadastreServer + 'CadastreNew/Cadastre/MapServer/exts/GKNServiceExtension/online/parcel/find',{
 					cadNum: cadastreNumber,//61:6:10104:2 66:41:0402004:16
 					onlyAttributes:'false',
 					returnGeometry:'true',
@@ -229,7 +230,7 @@ var cadastre =  function(container){
 					if(data.features[0].attributes.ERRORCODE!=1){
 						var str = '%7B%222%22%3A%22PARCEL_ID%20LIKE%20%27'+parcelId+'%27%22%2C%223%22%3A%22PARCEL_ID%20LIKE%20%27'+parcelId+'%27%22%2C%224%22%3A%22PARCEL_ID%20LIKE%20%27'+parcelId+'%27%22%7D';
 
-						$.getJSON('http://maps.rosreestr.ru/ArcGIS/rest/services/Geometry/GeometryServer/project',{
+						$.getJSON(cadastreServer+'Geometry/GeometryServer/project',{
 							inSR:'102100',
 							outSR:'4326',
 							geometries:'{"geometryType":"esriGeometryPoint","geometries":[{"x":'+data.features[0].attributes.XMIN+',"y":'+data.features[0].attributes.YMIN+'},{"x":'+data.features[0].attributes.XMAX+',"y":'+data.features[0].attributes.YMAX+'}]}',
@@ -243,7 +244,7 @@ var cadastre =  function(container){
 
 							setTimeout(function(){
 								var bbox = gmxAPI.map.getVisibleExtent().minX+','+gmxAPI.map.getVisibleExtent().minY+','+gmxAPI.map.getVisibleExtent().maxX+','+gmxAPI.map.getVisibleExtent().maxY;
-								var url="http://maps.rosreestr.ru/ArcGIS/rest/services/CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers=show:2,3,4&bboxSR=4326&imageSR=3395&size="+map.width()+","+map.height()+"&layerDefs="+str+"&f=image"+"&bbox="+bbox;
+								var url=cadastreServer+"CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers=show:2,3,4&bboxSR=4326&imageSR=3395&size="+map.width()+","+map.height()+"&layerDefs="+str+"&f=image"+"&bbox="+bbox;
 								cadastreLayerSearch.setImageExtent({url:url, extent: map.getVisibleExtent(), noCache: true});
 								cadastreLayerSearch.setVisible(true);
 								if(!balloonSearch || !balloonSearch.isVisible){
@@ -259,7 +260,7 @@ var cadastre =  function(container){
 							
 						});
 					}else{
-						$.getJSON('http://maps.rosreestr.ru/ArcGIS/rest/services/Geometry/GeometryServer/project',{
+						$.getJSON(cadastreServer+'Geometry/GeometryServer/project',{
 							inSR:'102100',
 							outSR:'4326',
 							geometries:'{"geometryType":"esriGeometryPoint","geometries":[{"x":'+data.features[0].attributes.XMIN+',"y":'+data.features[0].attributes.YMIN+'},{"x":'+data.features[0].attributes.XMAX+',"y":'+data.features[0].attributes.YMAX+'}]}',
@@ -381,7 +382,7 @@ function addCadastreInfoTool(){
 				balloonInfo.setPoint(map.getMouseX(), map.getMouseY());
 				balloonInfo.setVisible(false);
 				var html="<div style='width:300px; height:300px; overflow-x: hidden; overflow-y: scroll;'>";
-				$.getJSON('http://maps.rosreestr.ru/ArcGIS/rest/services/CadastreNew/CadastreSelected/MapServer/identify',{
+				$.getJSON(cadastreServer+'CadastreNew/CadastreSelected/MapServer/identify',{
 					f:'json',
 					geometry:'{"x":'+map.getMouseX()+',"y":'+map.getMouseY()+',"spatialReference":{"wkid":4326}}',
 					tolerance:'0',
@@ -529,7 +530,7 @@ function addCadastreInfoTool(){
 					balloonInfo.visible=true;
 					balloonInfo.div.innerHTML=html;
 					
-					var url="http://maps.rosreestr.ru/ArcGIS/rest/services/CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers="+showLayers+"&bboxSR=4326&imageSR=3395&size="+map.width()+","+map.height()+"&layerDefs="+str+"&f=image";
+					var url=cadastreServer+"CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers="+showLayers+"&bboxSR=4326&imageSR=3395&size="+map.width()+","+map.height()+"&layerDefs="+str+"&f=image";
 					var urlBbox="&bbox="+map.getVisibleExtent().minX+","+map.getVisibleExtent().minY+","+map.getVisibleExtent().maxX+","+map.getVisibleExtent().maxY;
 					
 					cadastreLayerInfo.setImageExtent({url:url+urlBbox, extent: map.getVisibleExtent(), noCache: true});
@@ -584,9 +585,18 @@ function removeCadastreInfoTool(){
 var publicInterface = {
 	pluginName: 'Cadastre',
 	Cadastre: cadastre,
-	/*afterViewer: function(params){
+	afterViewer: function(params){
+		if (params && params.cadastreHost) {
+			cadastreServer = params.cadastreServer;
+		}else{
+			cadastreServer = "http://maps.rosreestr.ru/arcgis/rest/services/";
+		}
+		
+		if(params && params.cadastreProxy){
+			cadastreServer = params.cadastreProxy + cadastreServer;
+		}
 	},
-	beforeViewer:function(){	
+	/*beforeViewer:function(){	
 	},*/
 	addMenuItems: addMenuItems
 };
