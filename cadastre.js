@@ -1,7 +1,7 @@
 (function(){
 
 var extendJQuery;
-extendJQuery = function() { 
+extendJQuery = function() {
 	if (typeof $ !== 'undefined') {
 		$.getCSS = $.getCSS || function(url) {
 			if (document.createStyleSheet) {
@@ -13,8 +13,26 @@ extendJQuery = function() {
 	} else {
 		setTimeout(extendJQuery, 100);
 	}
+
+	$('input.inputStyle').each(function(){
+		$(this)
+		.data('default', $(this).val())
+		.addClass('inactive')
+		.focus(function() {
+			$(this).removeClass('inactive');
+			if($(this).val() === $(this).data('default') || $(this).val() === '') {
+				$(this).val('');
+			}
+		})
+		.blur(function() {
+			if($(this).val() === '') {
+				$(this).addClass('inactive').val($(this).data('default'));
+			}
+		});
+	});
 }
 extendJQuery();
+
 var mapListenerInfo,cadastreLayerListener; // Listener для идентификации кадастрового участка на карте
 var balloonInfo,balloonSearch; // balloon для идентификации и поиска кадастрового участка на карте
 var cadastreLayerInfo,cadastreLayerSearch;
@@ -285,13 +303,12 @@ var cadastre =  function(container){
 				});	
 			}else
 				console.log("Кадастровый номер не валиден");
-			//inputField.value = '';
 		}
 		else
 			inputError(inputField);
 	}
 	//==============================================
-	var inputField = _input(null, [['dir','className','inputStyle'],['css','width','200px']]);
+	var inputField = _input(null, [['dir','className','inputStyle'],['css','width','200px'],['attr','value','66:41:0402004:16']]);
 
 	inputField.onkeydown = function(e){
 		var evt = e || window.event;
@@ -333,6 +350,7 @@ var cadastre =  function(container){
 			cadastreLayerSearch.setVisible(false);
 		inputField.value = '';
 		gmxAPI._tools.standart.selectTool('move');
+		gmxAPI._tools.standart.removeTool("cadastreInfo");
 	}
 }
 
@@ -353,6 +371,8 @@ var loadCadastre = function(){
 		checkCadastre = new cadastre(cadastreMenu.workCanvas);
 	}
 	checkCadastre.load();
+
+	extendJQuery();
 }
 
 var addMenuItems = function(upMenu){
@@ -369,9 +389,6 @@ function addCadastreInfoTool(){
 		'regularImageUrl': "http://projects.opengeo.org/common/geosilk/trunk/silk/information.png",
 		'activeImageUrl': "http://projects.opengeo.org/common/geosilk/trunk/silk/information.png",
 		'onClick': function(){
-			//map.setHandlers("onClick",function(){ ... не отрабатывается в leaflet версии
-			
-			
 			function createBalloonInfo(){
 				if(balloonSearch)
 					balloonSearch.setVisible(false);
@@ -421,7 +438,7 @@ function addCadastreInfoTool(){
 								html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";
 								html+="<tr><th>Объект обработан - можно удалять</th><td>"+value.attributes["Объект обработан - можно удалять"]+"</td></tr>";
 								html+="<tr><th>ONLINE_ACTUAL_DATE</th><td>"+value.attributes["ONLINE_ACTUAL_DATE"]+"</td></tr>";
-								html+="</table></div>"
+								html+="</table></div>";
 								break
 							case 14:
 							case 13:
@@ -446,7 +463,7 @@ function addCadastreInfoTool(){
 								html+="<tr><th>Экстент - Y мин.</th><td>"+value.attributes["Экстент - Y мин."]+"</td></tr>";
 								html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";
 								html+="<tr><th>Объект обработан - можно удалять</th><td>"+value.attributes["Объект обработан - можно удалять"]+"</td></tr>";
-								html+="</table></div>"
+								html+="</table></div>";
 								break;
 							case 10:
 							case 8:
@@ -476,7 +493,7 @@ function addCadastreInfoTool(){
 								html+="<tr><th>Экстент - Y мин.</th><td>"+value.attributes["Экстент - Y мин."]+"</td></tr>";
 								html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";
 								html+="<tr><th>Объект обработан - можно удалять</th><td>"+value.attributes["Объект обработан - можно удалять"]+"</td></tr>";
-								html+="</table></div>"
+								html+="</table></div>";
 								break;
 							case 4:
 							case 3:
@@ -502,10 +519,36 @@ function addCadastreInfoTool(){
 								html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";
 								html+="<tr><th>Объект обработан - можно удалять</th><td>"+value.attributes["Объект обработан - можно удалять"]+"</td></tr>";
 								html+="<tr><th>G_AREA</th><td>"+value.attributes["G_AREA"]+"</td></tr>";												
-								html+="</table></div>"
+								html+="</table></div>";
+								break;
+							case 1:
+								html+="<h3>"+value.layerName+"</h3><br><div><table style='text-align:left'>";
+								html+="<tr><th>OBJECTID</th><td>"+value.attributes["OBJECTID"]+"</td></tr>";
+								html+="<tr><th>Ключ СФ</th><td>"+value.attributes["Ключ СФ"]+"</td></tr>";
+								html+="<tr><th>Идентификатор ОКС</th><td>"+value.attributes["Идентификатор ОКС"]+"</td></tr>";
+								html+="<tr><th>Кадастровый номер</th><td>"+value.attributes["Кадастровый номер"]+"</td></tr>";
+								html+="<tr><th>Кадастровый номер старый</th><td>"+value.attributes["Кадастровый номер старый"]+"</td></tr>";
+								html+="<tr><th>Код статуса</th><td>"+value.attributes["Код статуса"]+"</td></tr>";
+								html+="<tr><th>Тип ОКС</th><td>"+value.attributes["Тип ОКС"]+"</td></tr>";
+								html+="<tr><th>Подпись</th><td>"+value.attributes["Подпись"]+"</td></tr>";
+								html+="<tr><th>Дата обновления</th><td>"+value.attributes["Дата обновления"]+"</td></tr>";
+								html+="<tr><th>Объект обработан - можно удалять</th><td>"+value.attributes["Объект обработан - можно удалять"]+"</td></tr>";
+								html+="<tr><th>Идентификатор родителя</th><td>"+value.attributes["Идентификатор родителя"]+"</td></tr>";
+								html+="<tr><th>Числовой идентификатор</th><td>"+value.attributes["Числовой идентификатор"]+"</td></tr>";
+								html+="<tr><th>Кадастровый номер ЗУ</th><td>"+value.attributes["Кадастровый номер ЗУ"]+"</td></tr>";
+								html+="<tr><th>Код ошибки</th><td>"+value.attributes["Код ошибки"]+"</td></tr>";
+								html+="<tr><th>X центра</th><td>"+value.attributes["X центра"]+"</td></tr>";
+								html+="<tr><th>Y центра</th><td>"+value.attributes["Y центра"]+"</td></tr>";
+								html+="<tr><th>Экстент - X мин.</th><td>"+value.attributes["Экстент - X мин."]+"</td></tr>";
+								html+="<tr><th>Экстент - X макс.</th><td>"+value.attributes["Экстент - X макс."]+"</td></tr>";
+								html+="<tr><th>Экстент - Y мин.</th><td>"+value.attributes["Экстент - Y мин."]+"</td></tr>";
+								html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";						
+								html+="</table></div>";
 								break;
 						}
 						var cadId = data.results[0].value;
+						//var cadId = data.results[0].attributes['OBJECTID'];
+						
 						var layerId = data.results[0].layerId;
 						var layersRequire;
 						if(layerId<=20 && layerId>=15)
@@ -516,9 +559,12 @@ function addCadastreInfoTool(){
 							layersRequire=[5,6,7,8];
 						else if(layerId<=4 && layerId>=2)
 							layersRequire=[2,3,4];
+						else if(layerId<=1 && layerId>=0)
+							layersRequire=[1,0];
 
 						$.each(layersRequire,function(index, value){
-							str +=value+":PKK_ID%20LIKE%20'"+cadId+"'";											
+							str +=value+":PKK_ID%20LIKE%20'"+cadId+"'";
+							
 							showLayers +=value;
 							if(layersRequire.length-1!=index){
 								str+=";";
