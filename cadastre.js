@@ -153,6 +153,21 @@ var cadastre =  function(container){
 
 	var iListenerID = -1;
 	
+	this.enableLayer = function(layerName){
+		if(layerName == 'Division'){
+			cbDivision.checked = true;
+		}else if(layerName == 'Cost'){
+			rbCostLayer.checked = true;
+		}else if(layerName == 'CostByArea'){
+			rbCostByAreaLayer.checked = true;
+		}else if(layerName == 'UseType'){
+			rbUseType.checked = true;
+		}else if(layerName == 'Category'){
+			rbCategory.checked = true;
+		} 
+		fnRefreshMap();
+	}
+	
 	this.load = function(){
 		cadastreLayer.setVisible(cbDivision.checked);
 		costLayer.setVisible(rbCostLayer.checked);
@@ -373,6 +388,7 @@ var loadCadastre = function(){
 	checkCadastre.load();
 
 	extendJQuery();
+	return checkCadastre;
 }
 
 var addMenuItems = function(upMenu){
@@ -631,6 +647,7 @@ function removeCadastreInfoTool(){
 var publicInterface = {
 	pluginName: 'Cadastre',
 	Cadastre: cadastre,
+	loadCadastre: loadCadastre,
 	afterViewer: function(params){
 		if (params && params.cadastreHost) {
 			cadastreServer = params.cadastreServer;
