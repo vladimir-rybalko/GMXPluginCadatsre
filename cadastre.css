@@ -1,6 +1,6 @@
 .cadastreLeftMenuLabel
 {
-  margin-Left: 3px;
+	margin-Left: 3px;
 }
 .cadastreLeftMenuRow
 {
@@ -21,4 +21,8 @@
 .inactive
 {
 	color: #666666;
+}
+
+#tableInfo th {
+	text-align: left;
 }
