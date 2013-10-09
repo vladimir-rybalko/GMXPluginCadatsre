@@ -21,10 +21,26 @@ extendJQuery = function() {
 }
 extendJQuery();
 
-var mapListenerInfo,cadastreLayerListener; // Listener для идентификации кадастрового участка на карте
+var dx,dy,map;
+var mapListenerInfo,cadastreLayerListener,cadastreLayerSearchListener; // Listener для идентификации кадастрового участка на карте
 var balloonInfo,balloonSearch; // balloon для идентификации и поиска кадастрового участка на карте
 var cadastreLayerInfo,cadastreLayerSearch;
 var cadastreServer;
+var liteCadastreLayer;
+var dialog;
+
+function getHeight(){
+		var mapExtent = gmxAPI.map.getVisibleExtent();
+		//console.log("mapExtent: ",mapExtent);
+		var yMin = gmxAPI.merc_y(mapExtent.minY) - dy;
+		var yMax = gmxAPI.merc_y(mapExtent.maxY) - dy;
+		var yHeight = Math.round((yMax - yMin) * gmxAPI._leaflet['mInPixel']);
+		//console.log("yMin: ",yMin," yMax: ",yMax);
+
+		return yHeight;
+	}
+
+
 var customSRC={"wkt":"PROJCS[\"WGS 84 / World Mercator\",GEOGCS[\"GCS_WGS_1984\",DATUM[\"D_WGS_1984\",SPHEROID[\"WGS_1984\",6378137.0,298.257223563]],PRIMEM[\"Greenwich\",0],UNIT[\"Degree\",0.017453292519943295]],PROJECTION[\"Mercator\"],PARAMETER[\"False_Easting\",0],PARAMETER[\"False_Northing\",0],PARAMETER[\"Central_Meridian\","+104.95158750033377+"],PARAMETER[\"Standard_Parallel_1\",0],PARAMETER[\"scale_factor\",1],UNIT[\"Meter\",1]]"};
 var centralMeridian=11683157.27848284;
 //================справочники Росреестра===============================//
@@ -42,26 +58,29 @@ var cadastre =  function(container){
 
 	var fnRefreshMap = function(){
 		cadastreLegend.style.display = (rbNo.checked)?('none'):('');
-
 		var mapExtent = map.getVisibleExtent();
-		var queryString = "&bbox="+(merc_x(mapExtent.minX)-centralMeridian).toString()+"%2C"+merc_y(mapExtent.minY)+"%2C"+(merc_x(mapExtent.maxX)-centralMeridian).toString()+"%2C"+merc_y(mapExtent.maxY)+"&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size=" +map.width()+","+map.height() + "&f=image";
+		var queryString = "&bbox="+(merc_x(mapExtent.minX)-centralMeridian-dx).toString()+"%2C"+(merc_y(mapExtent.minY)-dy)+"%2C"+(merc_x(mapExtent.maxX)-centralMeridian-dx).toString()+"%2C"+(merc_y(mapExtent.maxY)-dy)+"&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size=" +map.width()+"," + getHeight() + "&f=image";
+
 		var tUrl = cadastreServer+"CadastreNew/Thematic/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;
 		if (cbDivision.checked){
 			var sUrl = cadastreServer+"CadastreNew/Cadastre/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;
 			cadastreLayer.setImageExtent({url:sUrl, extent: mapExtent, noCache: true});
-			//add cadastreTool
 			addCadastreInfoTool();
 			gmxAPI._tools.standart.setVisible(true);
-
 		}else{
 			if(gmxAPI._tools.standart.getToolByName("cadastreInfo")){
 				gmxAPI._tools.standart.removeTool( 'cadastreInfo');
+				gmxAPI._tools.standart.removeTool( 'cadastreDx');
 				gmxAPI._tools.standart.selectTool("move");
 			}
 			if(cadastreLayerInfo)
 				cadastreLayerInfo.setVisible(false);
 			if(balloonInfo)
 				balloonInfo.remove();
+			if(mapListenerInfo)
+				map.removeListener("onClick", mapListenerInfo);
+			if(cadastreLayerListener)
+				map.removeListener("onMoveEnd", cadastreLayerListener);
 		}
 		if(rbCostLayer.checked){
 			tUrl+="&layers=show:1,7";
@@ -93,7 +112,6 @@ var cadastre =  function(container){
 			mapVisitorsLayer.setImageExtent({url:tUrl, extent: mapExtent, noCache: true});
 			cadastreLegend.innerHTML = 'Общее количество посещений</br><table cellspacing="0" cellpadding="0"><tbody><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0"src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//x8fHubq6qaqqhIWF676+9cbG/83No3FH3QAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>менее 100 000</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//x8fHubq6qaqqhIWF656U9aOZ/6eccAhG3wAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>100 000 - 500 000</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//x8fHubq6qaqqhIWF6YBu84Ju/YVuMQ3iHgAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>500 000 - 1 000 000</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//x8fHubq6qaqqhIWF4mNR7GFL9WBHhZwXygAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>1 000 000 - 5 000 000</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//x8fHubq6qaqqhIWF10k94EUw6D0k9XeHogAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>5 000 000 - 10 000 000</span></td></tr><tr><td class=cadastreLegendImageColumn><img class=cadastreLegendImage border="0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAMAAACelLz8AAAAAXNSR0IB2cksfwAAABhQTFRF/v//x8fHubq6qaqqhIWFzDAw1B8f3AAAabp87wAAAAh0Uk5TAP/////////VylQyAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAALklEQVQokWNgIBMwsmABTGApFlY2DMDKApFiY8cAbKNSw00KdwJgwpZsmMlNhABUegvpjanC7gAAAABJRU5ErkJggg=="></td><td><span>более 10 000 000</span></td></tr></tbody></table>';
 		}
-
 		cadastreLayer.setVisible(cbDivision.checked);
 		costLayer.setVisible(rbCostLayer.checked);
 		costByAreaLayer.setVisible(rbCostByAreaLayer.checked);
@@ -102,9 +120,7 @@ var cadastre =  function(container){
 		mapUpdateLayer.setVisible(rbMapUpdate.checked);
 		mapVisitorsLayer.setVisible(rbMapVisitors.checked);
 	}
-
 	var	div = _div(null, [['dir', 'className', 'cadastreLeftMenuContainer']]);
-
 	var trs = [];		
 	cbDivision = _checkbox(false, 'checkbox');
 	cbDivision.onclick = fnRefreshMap;
@@ -176,7 +192,9 @@ var cadastre =  function(container){
 		categoryLayer.setVisible(rbCategory.checked);
 		mapUpdateLayer.setVisible(rbMapUpdate.checked);
 		mapVisitorsLayer.setVisible(rbMapVisitors.checked);
+
 		iListenerID = gmxAPI.map.addListener("onMoveEnd", fnRefreshMap);
+		
 		fnRefreshMap();
 	}
 
@@ -191,7 +209,7 @@ var cadastre =  function(container){
 		return cadastreNumber;
 	}
 
-	function cadastreSearch(){
+		function cadastreSearch(){
 		
 		function cadastreSearchBalloon(data){
 			if(balloonInfo)
@@ -271,11 +289,15 @@ var cadastre =  function(container){
 							var maxX = data.geometries[1].x;
 							var maxY = data.geometries[1].y;
 							map.zoomToExtent(minX,minY,maxX,maxY);
+							var url=cadastreServer+"CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers=show:2,3,4&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size="+map.width()+","+ getHeight() +"&layerDefs="+str+"&f=image";
+							var getLayerSearch=function(){
+								var extent=map.getVisibleExtent();
+								var bboxUrl="&bbox="+((merc_x(extent.minX)-centralMeridian)-dx)+","+(merc_y(extent.minY)-dy)+","+((merc_x(extent.maxX)-centralMeridian)-dx)+","+(merc_y(extent.maxY)-dy);
+								cadastreLayerSearch.setImageExtent({url:url+bboxUrl, extent: extent, noCache: true});
+							}
 
 							setTimeout(function(){
-								var bbox = merc_x(map.getVisibleExtent().minX)+','+merc_y(map.getVisibleExtent().minY)+','+merc_x(map.getVisibleExtent().maxX)+','+merc_y(gmxAPI.map.getVisibleExtent().maxY);
-								var url=cadastreServer+"CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers=show:2,3,4&bboxSR=3395&imageSR=3395&size="+map.width()+","+map.height()+"&layerDefs="+str+"&f=image"+"&bbox="+bbox;
-								cadastreLayerSearch.setImageExtent({url:url, extent: map.getVisibleExtent(), noCache: true});
+								getLayerSearch();
 								cadastreLayerSearch.setVisible(true);
 								if(!balloonSearch || !balloonSearch.isVisible){
 									cadastreSearchBalloon(findInfo);
@@ -286,6 +308,15 @@ var cadastre =  function(container){
 									cadastreSearchBalloon(findInfo);
 								}
 							},300);
+							
+							if(!cadastreLayerSearchListener){
+								cadastreLayerSearchListener = gmxAPI.map.addListener("onMoveEnd", getLayerSearch);
+								cadastreLayerSearch.setVisible(true);
+							}else{
+								map.removeListener("onMoveEnd", cadastreLayerSearchListener);
+								cadastreLayerSearchListener = gmxAPI.map.addListener("onMoveEnd", getLayerSearch);
+								cadastreLayerSearch.setVisible(true);
+							}							
 						});
 					}else{
 						$.getJSON(cadastreServer+'Geometry/GeometryServer/project',{
@@ -360,6 +391,7 @@ var cadastre =  function(container){
 		inputField.value = '';
 		gmxAPI._tools.standart.selectTool('move');
 		gmxAPI._tools.standart.removeTool("cadastreInfo");
+		gmxAPI._tools.standart.removeTool("cadastreDx");
 	}
 }
 
@@ -383,7 +415,51 @@ var loadCadastre = function(){
 }
 
 function addCadastreInfoTool(){
-	var map = gmxAPI.map;
+	map = gmxAPI.map;
+	
+	var cadastreDx = {
+		'key': "cadastreDx",
+		'activeStyle': { },
+		'regularStyle': { 'paddingLeft': '2px' },
+		'regularImageUrl': gmxCore.getModulePath("cadastre")+"arrow.png",
+		'activeImageUrl': gmxCore.getModulePath("cadastre")+"arrow_active.png",
+		'onClick': function(){
+			var xOut,yOut,ex,ey,sx,sy;
+
+			var $str = $('<div id="coord">dx: '+dx+';<br /> dy: '+dy+';</div>');
+			if(!dialog)
+				dialog=showDialog("Координаты калибровки", $str.get(0), 200,65,false, false,null, function(){
+					dialog = null;
+				});
+			var drag = function(x, y, o) {              // Вызывается при mouseMove при нажатой мышке
+				xOut=(sx-merc_x(x)-dx)*(-1);
+				yOut=(sy-merc_y(y)-dy)*(-1);
+				$("#coord").html("dx: "+xOut.toFixed(2)+";<br /> dy: "+yOut.toFixed(2)+";");
+			};
+			var dragEnd = function(x, y, o) {    // Вызывается при mouseUp
+				ex = merc_x(x);
+				ey = merc_y(y);
+				dx=xOut;
+				dy=yOut;
+			};
+			var dragStart = function(x, y, o) {      // Вызывается при mouseDown
+				sx = merc_x(x);
+				sy = merc_y(y);
+			};
+			if(liteCadastreLayer)
+				liteCadastreLayer.enableDragging(drag, dragStart, dragEnd);
+			else if(cadastreLayer)
+				cadastreLayer.enableDragging(drag, dragStart, dragEnd);
+		},
+		'onCancel': function(){
+			if(liteCadastreLayer)
+				liteCadastreLayer.disableDragging();
+			else if(cadastreLayer)
+				cadastreLayer.disableDragging();
+			gmxAPI._tools.standart.selectTool("move");
+		},
+		'hint': gmxAPI.KOSMOSNIMKI_LOCALIZED("Ввод dx,dy", "Enter dx,dy")
+	};
 	var cadastreTool = {
 		'key': "cadastreInfo",
 		'activeStyle': { },
@@ -398,16 +474,23 @@ function addCadastreInfoTool(){
 					cadastreLayerSearch.setVisible(false);
 
 				balloonInfo = map.addBalloon();
-				balloonInfo.setPoint(map.getMouseX(), map.getMouseY());
+				var mousePosX=map.getMouseX();
+				var mousePosY=map.getMouseY();
+				balloonInfo.setPoint(mousePosX, mousePosY);
+				mousePosX=merc_x(mousePosX);
+				mousePosY=merc_y(mousePosY);
 				balloonInfo.setVisible(false);
 				var html="<div style='width:300px; height:300px; overflow-x: hidden; overflow-y: scroll;'>";
+				var geoX=from_merc_x(mousePosX-dx.toFixed(2));
+				var geoY=from_merc_y(mousePosY-dy.toFixed(2));
+				extent = map.getVisibleExtent();
 				$.getJSON(cadastreServer+'CadastreNew/CadastreSelected/MapServer/identify',{
 					f:'json',
-					geometry:'{"x":'+map.getMouseX()+',"y":'+map.getMouseY()+',"spatialReference":{"wkid":4326}}',
+					geometry:'{"x":'+geoX+',"y":'+geoY+',"spatialReference":{"wkid":4326}}',
 					tolerance:'0',
 					returnGeometry:'false',
-					mapExtent:'{"xmin":'+map.getVisibleExtent().minX+',"ymin":'+map.getVisibleExtent().minY+',"xmax":'+map.getVisibleExtent().maxX+',"ymax":'+map.getVisibleExtent().maxY+',"spatialReference":{"wkid":4326}}',
-					imageDisplay:map.width()+','+map.height()+',96',
+					mapExtent:'{"xmin":'+from_merc_x(merc_x(extent.minX)-dx.toFixed(2))+',"ymin":'+from_merc_y(merc_y(extent.minY)-dy.toFixed(2))+',"xmax":'+from_merc_x(merc_x(extent.maxX)-dx.toFixed(2))+',"ymax":'+from_merc_y(merc_y(extent.maxY)-dy.toFixed(2))+',"spatialReference":{"wkid":4326}}',
+					imageDisplay:map.width()+','+ getHeight() +',96',
 					geometryType:'esriGeometryPoint',
 					sr:'4326',
 					layers:'top'//top or all or layerId
@@ -455,7 +538,7 @@ function addCadastreInfoTool(){
 									html+="<tr><th>Кадастровый номер</th><td>"+value.attributes["Кадастровый номер"]+"</td></tr>";
 									html+="<tr><th>Наименование</th><td>"+value.attributes["Наименование"]+"</td></tr>";
 									html+="<tr><th>Аннотация</th><td>"+value.attributes["Аннотация"]+"</td></tr>";
-									html+="<tr><th>Код ошибки</th><td>"+value.attributes["Код ошибки"]+"</td></tr>";												
+									html+="<tr><th>Код ошибки</th><td>"+value.attributes["Код ошибки"]+"</td></tr>";
 									html+="<tr><th>Число КК</th><td>"+value.attributes["Число КК"]+"</td></tr>";
 									html+="<tr><th>Число ЗУ</th><td>"+value.attributes["Число ЗУ"]+"</td></tr>";
 									html+="<tr><th>Дата актуальности</th><td>"+value.attributes["Дата актуальности"]+"</td></tr>";
@@ -521,7 +604,7 @@ function addCadastreInfoTool(){
 									html+="<tr><th>Экстент - Y мин.</th><td>"+value.attributes["Экстент - Y мин."]+"</td></tr>";
 									html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";
 									html+="<tr><th>Объект обработан - можно удалять</th><td>"+value.attributes["Объект обработан - можно удалять"]+"</td></tr>";
-									html+="<tr><th>G_AREA</th><td>"+value.attributes["G_AREA"]+"</td></tr>";												
+									html+="<tr><th>G_AREA</th><td>"+value.attributes["G_AREA"]+"</td></tr>";
 									html+="</table></div>";
 									break;
 								case 1:
@@ -545,7 +628,7 @@ function addCadastreInfoTool(){
 									html+="<tr><th>Экстент - X мин.</th><td>"+value.attributes["Экстент - X мин."]+"</td></tr>";
 									html+="<tr><th>Экстент - X макс.</th><td>"+value.attributes["Экстент - X макс."]+"</td></tr>";
 									html+="<tr><th>Экстент - Y мин.</th><td>"+value.attributes["Экстент - Y мин."]+"</td></tr>";
-									html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";						
+									html+="<tr><th>Экстент - Y макс.</th><td>"+value.attributes["Экстент - Y макс."]+"</td></tr>";
 									html+="</table></div>";
 									break;
 							}
@@ -580,11 +663,11 @@ function addCadastreInfoTool(){
 						cadastreLayerInfo.setVisible(false);
 					});
 					cadastreLayerInfo = map.addObject();
-					
-					var url=cadastreServer+"CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers="+showLayers+"&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size="+map.width()+","+map.height()+"&layerDefs="+str+"&f=image";
+					var url=cadastreServer+"CadastreNew/CadastreSelected/MapServer/export?dpi=96&transparent=true&format=png32&layers="+showLayers+"&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size="+map.width()+","+ getHeight() +"&layerDefs="+str+"&f=image";
 					var getLayerInfo=function(){
-						var bboxUrl="&bbox="+(merc_x(map.getVisibleExtent().minX)-centralMeridian).toString()+","+merc_y(map.getVisibleExtent().minY)+","+(merc_x(map.getVisibleExtent().maxX)-centralMeridian).toString()+","+merc_y(map.getVisibleExtent().maxY);
-						cadastreLayerInfo.setImageExtent({url:url+bboxUrl, extent: map.getVisibleExtent(), noCache: true});
+						extent = map.getVisibleExtent()
+						var bboxUrl="&bbox="+(merc_x(extent.minX)-centralMeridian-dx)+","+(merc_y(extent.minY)-dy)+","+(merc_x(extent.maxX)-centralMeridian-dx)+","+(merc_y(extent.maxY)-dy);
+						cadastreLayerInfo.setImageExtent({url:url+bboxUrl, extent: extent, noCache: true});
 					}
 					getLayerInfo();
 					if(!cadastreLayerListener){
@@ -598,7 +681,7 @@ function addCadastreInfoTool(){
 				});
 				balloonInfo.resize();
 		}
-			mapListenerInfo = map.addListener("onClick",function(){
+			mapListenerInfo = map.addListener("onClick",function(e){
 				if(!balloonInfo || !balloonInfo.isVisible){
 					createBalloonInfo();
 				}
@@ -626,8 +709,10 @@ function addCadastreInfoTool(){
 		'hint': gmxAPI.KOSMOSNIMKI_LOCALIZED("Информация о КУ", "Cadastre information")
 	};
 
-	if(!gmxAPI._tools.standart.getToolByName("cadastreInfo"))
+	if(!gmxAPI._tools.standart.getToolByName("cadastreInfo")){
 		gmxAPI._tools.standart.addTool( 'cadastreInfo', cadastreTool);
+		gmxAPI._tools.standart.addTool( 'cadastreDx', cadastreDx);
+	}
 };
 
 var publicInterface = {
@@ -638,13 +723,18 @@ var publicInterface = {
 		params = params || {};
 		cadastreServer = params.cadastreProxy || '';
 		cadastreServer += params.cadastreServer || "http://maps.rosreestr.ru/arcgis/rest/services/";
+		
+		if(params.dx) dx=params.dx;
+		else dx=0;
+
+		if(params.dy) dy=params.dy;
+		else dy=0;
 
 		if(params.UIMode=="lite"){				
 			_map = gmxAPI.map || globalFlashMap;
 			if (!_map) return;
 
 			var cadastreTools = new gmxAPI._ToolsContainer('cadastre');
-			var liteCadastreLayer;
 			var mapListener;
 			
 			var onCancelCadastreTools = function(){
@@ -657,6 +747,7 @@ var publicInterface = {
 					balloonInfo.remove();
 				if(gmxAPI._tools.standart.getToolByName("cadastreInfo")){
 					gmxAPI._tools.standart.removeTool( 'cadastreInfo');
+					gmxAPI._tools.standart.removeTool( 'cadastreDx');
 					gmxAPI._tools.standart.selectTool("move");
 				}
 				if(mapListenerInfo)
@@ -669,7 +760,8 @@ var publicInterface = {
 				liteCadastreLayer.setCopyright('<a href="http://rosreestr.ru">© Росреестр</a>');
 				var loadCadastreLayer = function(){
 					var mapExtent = _map.getVisibleExtent();
-					var queryString = "&bbox="+(merc_x(mapExtent.minX)-centralMeridian).toString()+"%2C"+merc_y(mapExtent.minY)+"%2C"+(merc_x(mapExtent.maxX)-centralMeridian).toString()+"%2C"+merc_y(mapExtent.maxY)+"&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size=" +_map.width()+","+_map.height() + "&f=image";
+					console.log(getHeight());
+					var queryString = "&bbox="+(merc_x(mapExtent.minX)-centralMeridian-dx).toString()+"%2C"+(merc_y(mapExtent.minY)-dy)+"%2C"+(merc_x(mapExtent.maxX)-centralMeridian-dx).toString()+"%2C"+(merc_y(mapExtent.maxY)-dy)+"&bboxSR="+JSON.stringify(customSRC)+"&imageSR="+JSON.stringify(customSRC)+"&size=" +_map.width()+"," + getHeight() + "&f=image";
 					var sUrl = cadastreServer+"CadastreNew/Cadastre/MapServer/export?dpi=96&transparent=true&format=png32"+queryString;	
 					liteCadastreLayer.setImageExtent({url:sUrl, extent: mapExtent, noCache: true});
 				}
@@ -677,6 +769,7 @@ var publicInterface = {
 				mapListener = _map.addListener("onMoveEnd", loadCadastreLayer);
 				liteCadastreLayer.setVisible(true);
 			};
+			
 			
 			var attr = {
 				'onClick': onClickCadastreTools,

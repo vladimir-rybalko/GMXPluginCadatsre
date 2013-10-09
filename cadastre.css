@@ -22,7 +22,15 @@
 {
 	color: #666666;
 }
+/*#tableInfo tr{
+	text-align: left;
+}*/
 
 #tableInfo th {
-	text-align: left;
-}
+     /*background: #ccc;*/
+     text-align: left;
+    }
+/*#tableInfo td, th {
+     border: 1px solid #800; 
+     padding: 4px; 
+    } */
